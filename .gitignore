@@ -1,0 +1,22 @@
+# Environment & secrets
+.env
+*.env
+backend/.env
+
+# Dependencies
+node_modules/
+backend/node_modules/
+frontend-starter/node_modules/
+
+# Angular build output and cache
+frontend-starter/.angular/
+frontend-starter/dist/
+
+# Backend uploads and local data
+backend/data/uploads/*
+!backend/data/uploads/.gitkeep
+
+# System & IDE files
+.DS_Store
+Thumbs.db
+*.log

@@ -13,7 +13,17 @@ export class LoginPageComponent {
   private readonly router = inject(Router);
 
   readonly error = signal('');
+  readonly loading = signal(false);
+  readonly submitted = signal(false);
+
+  constructor() {
+    if (this.auth.token()) {
+      void this.router.navigateByUrl('/tracks');
+    }
+  }
+
   readonly form = new FormGroup({
+
     email: new FormControl('demo@example.com', {
       nonNullable: true,
       validators: [Validators.required, Validators.email],
@@ -25,16 +35,29 @@ export class LoginPageComponent {
   });
 
   submit(): void {
+    this.submitted.set(true);
+    this.error.set('');
+
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
+
+    this.loading.set(true);
     const values = this.form.getRawValue();
+
     this.auth.login(values.email, values.password).subscribe({
       next: () => {
+        this.loading.set(false);
         console.debug('[LoginPage] Connexion réussie');
         void this.router.navigateByUrl('/tracks');
       },
       error: (error: { error?: { message?: string } }) => {
-        console.error('[LoginPage] Échec de connexion', error);
-        this.error.set(error.error?.message ?? 'Erreur de connexion');
+        this.loading.set(false);
+        console.error('[LoginPage] Échec de connexion', error.error?.message || 'Erreur');
+        this.error.set(error.error?.message ?? 'Identifiants incorrects ou problème de connexion');
       },
     });
   }
 }
+

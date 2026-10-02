@@ -1,14 +1,62 @@
 <section class="card">
-  <h1>Mon profil</h1>
-  <button type="button" (click)="load()">Charger mon profil</button>
+  <div class="profile-header">
+    <h1>Mon profil</h1>
+    <div class="profile-actions">
+      <button type="button" class="btn-secondary" (click)="load()" [disabled]="loading()">
+        {{ loading() ? 'Chargement...' : 'Actualiser' }}
+      </button>
+      <button type="button" class="btn-danger" (click)="logout()">Déconnexion</button>
+    </div>
+  </div>
+
+  @if (successMessage()) {
+    <div class="alert alert-success">{{ successMessage() }}</div>
+  }
+  @if (errorMessage()) {
+    <div class="alert alert-error">{{ errorMessage() }}</div>
+  }
+
+  @if (loading() && !auth.currentUser()) {
+    <p class="loading-hint">Chargement de vos informations...</p>
+  }
+
   @if (auth.currentUser(); as user) {
-    <p>
-      <b>{{ user.name }}</b><br />{{ user.email }}<br />
-      Membre depuis {{ user.createdAt.slice(0, 10) }}
-    </p>
+    <div class="user-details">
+      <div class="detail-row">
+        <span class="detail-label">Nom actuel :</span>
+        <span class="detail-value"><strong>{{ user.name }}</strong></span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Adresse email :</span>
+        <span class="detail-value">{{ user.email }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Membre depuis le :</span>
+        <span class="detail-value">{{ user.createdAt.slice(0, 10) }}</span>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <h2>Modifier mes informations</h2>
     <form [formGroup]="form" (ngSubmit)="save()">
-      <label>Nouveau nom<input formControlName="name" /></label>
-      <button type="submit">Enregistrer</button>
+      <label>
+        Nouveau nom
+        <input formControlName="name" placeholder="Votre nouveau nom" />
+        @if (form.controls.name.invalid && form.controls.name.touched) {
+          <span class="field-error">
+            @if (form.controls.name.hasError('required')) {
+              Le nom ne peut pas être vide.
+            } @else if (form.controls.name.hasError('minlength')) {
+              Le nom doit comporter au moins 2 caractères.
+            }
+          </span>
+        }
+      </label>
+      <button type="submit" [disabled]="saving() || form.invalid">
+        {{ saving() ? 'Enregistrement...' : 'Enregistrer les modifications' }}
+      </button>
     </form>
   }
 </section>
+

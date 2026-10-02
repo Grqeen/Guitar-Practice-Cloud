@@ -1,1 +1,373 @@
-:host { display: block; }
+:host {
+  display: block;
+}
+
+.tracks-container {
+  display: grid;
+  gap: 1.5rem;
+}
+
+/* En-tête de la bibliothèque */
+.library-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e1ebe7;
+}
+
+.library-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.library-title-group h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  color: #123d32;
+}
+
+.counter-badge {
+  background: #e2ece8;
+  color: #123d32;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.25rem 0.65rem;
+  border-radius: 20px;
+}
+
+.library-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.search-input {
+  padding: 0.5rem 0.8rem;
+  font-size: 0.9rem;
+  border: 1px solid #b8cbc5;
+  border-radius: 8px;
+  width: 200px;
+  transition: border-color 0.2s, width 0.2s;
+}
+
+.search-input:focus {
+  width: 240px;
+}
+
+.btn-icon {
+  padding: 0.5rem 0.75rem;
+  font-size: 1rem;
+}
+
+/* Upload zone */
+.upload-card h2 {
+  margin-top: 0;
+  margin-bottom: 1.2rem;
+  font-size: 1.35rem;
+  color: #123d32;
+}
+
+.selected-file-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: #f0f7f4;
+  border: 1px dashed #276c57;
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+  margin: 0.8rem 0;
+}
+
+.file-icon {
+  font-size: 1.5rem;
+}
+
+.file-info strong {
+  display: block;
+  font-size: 0.9rem;
+  color: #123d32;
+  word-break: break-all;
+}
+
+.file-info small {
+  color: #61756f;
+}
+
+.btn-block {
+  width: 100%;
+  margin-top: 0.8rem;
+}
+
+/* Liste des morceaux & Cards */
+.tracks-list {
+  display: grid;
+  gap: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.track-card {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  padding: 1rem 1.2rem;
+  background: #fbfdfc;
+  border: 1px solid #e1ebe7;
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.track-card:hover {
+  background: white;
+  border-color: #b8cbc5;
+  box-shadow: 0 4px 15px rgba(23, 49, 42, 0.06);
+  transform: translateY(-1px);
+}
+
+.track-card.track-playing {
+  background: #f0f8f5;
+  border-color: #1d755e;
+  box-shadow: 0 0 0 2px rgba(29, 117, 94, 0.2);
+}
+
+.track-cover {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #123d32, #276c57);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  flex-shrink: 0;
+  box-shadow: 0 3px 8px rgba(18, 61, 50, 0.15);
+}
+
+.playing-pulse {
+  background: linear-gradient(135deg, #1d755e, #3cb371);
+  animation: pulse 1.8s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.track-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.track-title {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #17312a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-filename {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.82rem;
+  color: #61756f;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.meta-pill {
+  font-size: 0.75rem;
+  color: #435b54;
+  background: #edf3f0;
+  padding: 0.15rem 0.55rem;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.format-pill {
+  background: #123d32;
+  color: white;
+  font-weight: 700;
+}
+
+.date-pill {
+  opacity: 0.85;
+}
+
+.track-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.btn-play {
+  padding: 0.55rem 1rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.btn-play.btn-playing {
+  background: #276c57;
+}
+
+.btn-delete {
+  background: transparent;
+  color: #8a9e97;
+  border: 1px solid transparent;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-delete:hover {
+  background: #ffebee;
+  color: #c62828;
+  border-color: #ffcdd2;
+}
+
+/* État vide & chargement */
+.empty-state {
+  text-align: center;
+  padding: 3rem 1.5rem;
+  background: #f8faf9;
+  border-radius: 12px;
+  border: 1px dashed #c8dbd5;
+}
+
+.empty-icon {
+  font-size: 2.5rem;
+  display: block;
+  margin-bottom: 0.8rem;
+}
+
+.empty-state p {
+  margin: 0 0 0.3rem 0;
+  color: #17312a;
+}
+
+.empty-state small {
+  color: #61756f;
+}
+
+.loading-box {
+  padding: 2rem;
+  text-align: center;
+  color: #61756f;
+}
+
+/* Pagination */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e1ebe7;
+}
+
+.pager-info {
+  font-size: 0.9rem;
+  color: #435b54;
+}
+
+/* Barre de lecture fixe en bas de l'écran */
+.player-bar-container {
+  position: sticky;
+  bottom: 1.5rem;
+  margin-top: 2rem;
+  z-index: 100;
+}
+
+.player-bar {
+  background: #123d32;
+  color: white;
+  border-radius: 16px;
+  padding: 1.2rem 1.8rem;
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.player-info {
+  display: grid;
+  gap: 0.25rem;
+  max-width: 320px;
+}
+
+.player-badge {
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: #a8dadc;
+  font-weight: 700;
+}
+
+.player-title {
+  font-size: 1.05rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-meta {
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+.player-audio-wrapper {
+  flex: 1;
+  min-width: 280px;
+}
+
+.audio-element {
+  width: 100%;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+.player-loading {
+  margin: 0;
+  font-size: 0.9rem;
+  font-style: italic;
+  color: #a8dadc;
+}
+
+.player-error {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #ff8b8b;
+}
+
+@media (max-width: 860px) {
+  .player-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .player-info {
+    max-width: 100%;
+  }
+}
+
