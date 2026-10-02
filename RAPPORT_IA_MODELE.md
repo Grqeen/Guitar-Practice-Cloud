@@ -332,3 +332,170 @@ Le sujet propose d'enrichir l'application en associant une pochette à chaque pi
   - **MusicBrainz / Cover Art Archive** : API publique ouverte permettant d'interroger la base de données discographique mondiale via le code ISRC, l'artiste et le titre, et de récupérer l'URL légale de la pochette d'album (`https://coverartarchive.org/release/...`).
   - **Discogs API ou Deezer / Spotify Web API** : Permettent de récupérer les métadonnées enrichies, le genre musical, et les visuels d'albums sous licence.
 
+---
+
+# Partie III : TP3 — Fiabilisation et enrichissement du frontend
+
+## 11. Mission 5 — Suppression sécurisée d’une piste
+
+### Objectif
+Mettre en œuvre la suppression complète d'une piste depuis l'interface Angular en passant exclusivement par `TrackService`, avec confirmation préalable, verrouillage anti-double clic, retours d'informations visuels immédiats (composant Angular SnackBar), gestion fine des erreurs HTTP 404/403 et recalcul automatique de la pagination.
+
+### Architecture du flux de suppression
+```text
+[Bouton Supprimer] ──> confirmation window.confirm
+                   ──> deletingId.set(track.id) (verrou anti-double clic)
+                   ──> TrackService.delete(id)
+                   ──> HttpClient.delete('/api/tracks/:id')
+                   ──> authInterceptor (injecte JWT Bearer)
+                   ──> Express API (:3000) [auth + vérification ownerId]
+                   ──> MongoDB (Track.findByIdAndDelete) + fs.unlink (fichier physique)
+                   ──> HTTP 204 No Content
+                   ──> SnackBarService.success("Morceau supprimé...")
+                   ──> Recalcul page (si page vide) + load()
+```
+
+### Éléments techniques implémentés
+1. **Composant et Service SnackBar** :
+   - [SnackBarService](file:///c:/Users/aitdy/Documents/AngularM1_Miage_2026_2027_TP123/frontend-starter/src/app/shared/services/snackbar.service.ts) : Service injectable centralisé gérant les notifications toast réactives (`messages = signal<SnackBarMessage[]>([])`), avec méthodes `success()`, `error()`, `info()` et temporisation paramétrable.
+   - [SnackBarComponent](file:///c:/Users/aitdy/Documents/AngularM1_Miage_2026_2027_TP123/frontend-starter/src/app/shared/components/snackbar/snackbar.component.ts) : Composant autonome affichant les toasts avec icônes distinctes, bordures colorées et animation CSS `slideIn`.
+2. **Contrôle de concurrence & Anti-double clic** :
+   - Signal `deletingId = signal<string | null>(null)` dans `TracksPageComponent`.
+   - Tous les boutons « Supprimer » sont désactivés dès qu'une suppression est en cours (`[disabled]="deletingId() !== null"`).
+   - Le bouton cliqué affiche une animation d'attente (icône ⏳ clignotante).
+3. **Traitement des cas d'erreur réseau** :
+   - **Erreur 404 (Piste inexistante)** : Si la piste a déjà été supprimée par un autre onglet ou client, le SnackBar affiche : *"Ce morceau n'existe plus ou a déjà été supprimé."* et la bibliothèque se rafraîchit automatiquement (`this.load()`) pour synchroniser la vue avec la réalité du serveur.
+   - **Erreur 403 (Non propriétaire)** : Affichage d'un message de refus d'autorisation.
+4. **Gestion de l'audio actif et pagination** :
+   - Si la piste supprimée était en cours de lecture dans le lecteur persistant, l'audio est stoppé immédiatement et l'URL mémoire libérée via `URL.revokeObjectURL()`.
+   - Si la suppression vide la dernière page ($page > 1$ et 1 seul élément restant), l'application décrémente automatiquement le signal `page` vers $page - 1$ avant de recharger.
+
+---
+
+## 12. Mission 6 — Progression de l’upload multipart
+
+### Objectif
+Enrichir le téléversement de fichiers audio pour suivre en direct le pourcentage d'envoi réseau (0% à 100%), désactiver les contrôles pour prévenir toute double soumission et afficher une barre de progression visuelle animée.
+
+### Traitement des événements asynchrones (`HttpEvent`)
+Contrairement à une requête HTTP standard qui n'émet qu'une unique valeur finale (la réponse), un upload avec suivi de progression émet un flux continu d'événements :
+1. `HttpEventType.Sent` : La requête est expédiée sur le socket réseau.
+2. `HttpEventType.UploadProgress` : Émis par tranches d'octets transférés. Contient `event.loaded` et `event.total`.
+3. `HttpEventType.ResponseHeader` : Les en-têtes HTTP de la réponse serveur sont reçus.
+4. `HttpEventType.Response` : La réponse finale contenant le document `Track` créé au format JSON.
+
+### Configuration dans `TrackService`
+```typescript
+upload(file: File, title: string): Observable<HttpEvent<Track>> {
+  const body = new FormData();
+  body.append('audio', file);
+  body.append('title', title);
+  return this.http.post<Track>('/api/tracks', body, {
+    reportProgress: true,
+    observe: 'events',
+  });
+}
+```
+
+### Calcul du pourcentage et gestion des 4 états dans `TracksPageComponent`
+- **Absence d'upload (`idle`)** : Formulaire interactif, barre de progression masquée.
+- **Upload en cours (`uploading`)** :
+  - Contrôles désactivés : `<input type="file" [disabled]="uploading()">`, `<input [disabled]="uploading()">`, et bouton de soumission bloqué.
+  - Calcul dynamique :
+    $$\text{Pourcentage} = \text{Math.round}\left(\frac{\text{event.loaded}}{\text{event.total}} \times 100\right)$$
+  - Barre de progression animée dans le template avec `[style.width.%]="uploadProgress()"` et indicateur textuel.
+- **Réussite (`success`)** :
+  - `uploadProgress.set(100)`
+  - Notification toast SnackBar : *"Morceau « ... » téléversé avec succès !"*
+  - Réinitialisation complète du formulaire et rechargement de la première page de la bibliothèque.
+- **Échec (`error`)** :
+  - Réinitialisation de la progression à 0%.
+  - Notification d'erreur ciblée via SnackBar sans aucune fuite d'informations sensibles.
+
+---
+
+## 13. Mission 7 — Tests automatisés (Frontend & Backend)
+
+### Infrastructure de test
+- **Frontend** : Vitest avec le builder `@angular/build:unit-test`, environnement JSDOM et `provideHttpClientTesting()`.
+- **Backend** : Node.js test runner natif (`node --test`) avec `node:assert/strict`.
+
+### Tableau récapitulatif des tests frontend implémentés (13 tests)
+
+| Fichier de test | Composant / Service testé | Scénario vérifié | Type de mock |
+|---|---|---|---|
+| `auth.service.spec.ts` | `AuthService.login()` | Appelle `POST /api/auth/login` avec email/password, stocke le token et notifie `currentUser` | `HttpTestingController` |
+| `auth.service.spec.ts` | `AuthService.logout()` | Réinitialise les signaux `token` et `currentUser` et vide le `localStorage` | Signal & Storage |
+| `track.service.spec.ts` | `TrackService.list()` | Transmet exactement les paramètres `?page=2&limit=10` à `/api/tracks` | `HttpTestingController` |
+| `track.service.spec.ts` | `TrackService.delete()` | Émet la requête `DELETE /api/tracks/:id` | `HttpTestingController` |
+| `track.service.spec.ts` | `TrackService.audio()` | Émet la requête `GET /api/tracks/:id/audio` avec `responseType: 'blob'` | `HttpTestingController` |
+| `auth.interceptor.spec.ts` | `authInterceptor` | Injecte l'en-tête `Authorization: Bearer <token>` sur requête sortante | `withInterceptors` |
+| `auth.interceptor.spec.ts` | `authInterceptor` | Ne modifie pas les requêtes publiques lorsqu'aucun token n'est stocké | `withInterceptors` |
+| `auth.interceptor.spec.ts` | `authInterceptor` | Détecte le statut HTTP 401, déclenche `logout()` et redirige vers `/login` | `withInterceptors` & Router |
+| `auth.guard.spec.ts` | `authGuard` | Autorise l'accès (renvoie `true`) lorsque l'utilisateur détient un token | `runInInjectionContext` |
+| `auth.guard.spec.ts` | `authGuard` | Redirige vers `/login` via `UrlTree` lorsqu'aucun token n'est présent | `runInInjectionContext` |
+| `tracks-page.spec.ts` | `TracksPageComponent` | Charge automatiquement la bibliothèque paginée à l'initialisation (`ngOnInit`) | Spies RxJS (`of`) |
+| `tracks-page.spec.ts` | `TracksPageComponent` | Demande confirmation, appelle `TrackService.delete` et affiche le toast SnackBar | `window.confirm` + SnackBar spy |
+| `tracks-page.spec.ts` | `TracksPageComponent` | Affiche un message d'erreur approprié lors d'une réponse 404 (piste déjà absente) | `throwError` 404 |
+
+### Extension backend (`backend/test/api.test.js`)
+5 tests automatisés vérifiant la conformité du contrat d'API et la sécurité des routes :
+1. `GET /api/health` : Contrôle de disponibilité sans dépendance MongoDB.
+2. Schémas Mongoose : Validation des relations `Track.ownerId -> User`.
+3. Sécurité `GET /api/users/me` : Renvoie HTTP `401 Unauthorized` sans en-tête d'autorisation.
+4. Sécurité `GET /api/tracks` : Renvoie HTTP `401 Unauthorized` si le token JWT est forgé ou malformé.
+5. Sécurité `DELETE /api/tracks/:id` : Renvoie HTTP `401 Unauthorized` sans jeton valide.
+
+---
+
+## 14. Restitution orale — Questions / Réponses d'examen
+
+### 1. Pourquoi la suppression passe-t-elle par un service ?
+La séparation des responsabilités (SOC — *Separation of Concerns*) est le principe fondamental d'Angular :
+- Le **composant** est uniquement responsable de la logique de présentation (affichage, interactions avec l'utilisateur, boîte de dialogue de confirmation, affichage de l'état de suppression, notifications SnackBar).
+- Le **service** (`TrackService`) encapsule la logique métier et la communication réseau avec `HttpClient`.
+- Si l'URL de l'API change, si des paramètres supplémentaires sont requis ou si le format d'échange évolue, **seul le service est modifié**, sans impacter les composants. Cela permet également d'isoler et de tester le composant unitairement en remplaçant simplement le service par un faux objet (*mock*).
+
+### 2. Comment le backend protège-t-il la suppression ?
+Le frontend ne peut jamais être considéré comme sécurisé (le code JavaScript client peut être modifié, contourné par `curl` ou inspecté dans les DevTools). La sécurité est donc intégralement verrouillée côté serveur dans `backend/src/app.js` :
+1. Le middleware `auth` intercepte la requête, vérifie la signature cryptographique du JWT avec le secret serveur et extrait l'identifiant de l'utilisateur (`req.auth.sub`).
+2. La route `DELETE /api/tracks/:id` effectue une recherche stricte avec une clause double :
+   $$\text{Track.findOneAndDelete}(\{\; \_id: req.params.id, \; ownerId: req.auth.sub \;\})$$
+3. Si un utilisateur tente de supprimer la piste d'un tiers, ou une piste inexistante, la requête ne trouve aucun document correspondant et renvoie immédiatement un statut HTTP `404 Not Found`.
+4. Si le document existe et appartient bien à l'utilisateur demandeur, MongoDB supprime le document et le serveur efface le binaire associé sur le disque dur (`fs.unlink`).
+
+### 3. Comment Angular calcule-t-il le pourcentage d’upload ?
+Dans la requête HTTP, l'option `{ reportProgress: true, observe: 'events' }` demande à Angular d'écouter les événements de progression natifs du navigateur (`XMLHttpRequest.upload.onprogress`).
+Chaque fois qu'un paquet de données quitte la machine, Angular émet un événement `HttpEventType.UploadProgress` contenant :
+- `event.loaded` : Nombre d'octets déjà transmis au serveur.
+- `event.total` : Taille totale du fichier en octets.
+Le composant calcule le pourcentage d'avancement par la formule :
+$$\text{Pourcentage} = \text{Math.round}\left(\frac{\text{event.loaded}}{\text{event.total}} \times 100\right)$$
+Ce résultat est ensuite injecté dans le signal réactif `uploadProgress`, provoquant instantanément la mise à jour fluide de la largeur de la barre de progression dans le DOM.
+
+### 4. Pourquoi les tests HTTP n’ont-ils pas besoin de MongoDB ?
+Les tests unitaires frontend visent à vérifier le comportement du code client de façon isolée, rapide et déterministe.
+Grâce à `HttpTestingController` (fourni par `provideHttpClientTesting()`), les requêtes `HttpClient` réelles ne sortent jamais sur la carte réseau :
+- Le contrôleur intercepte l'appel en mémoire vive, vérifie que l'URL (`/api/tracks`), la méthode (`DELETE`, `POST`, `GET`), les en-têtes (`Authorization`) et le corps envoyé sont conformes aux attentes.
+- Le test simule ensuite immédiatement la réponse HTTP souhaitée (succès `200`, `204` ou erreur `404`, `401`) via `req.flush(...)`.
+- Il n'y a donc aucun besoin d'allumer Node.js, d'avoir une connexion Internet ni d'interroger la base MongoDB Atlas.
+
+### 5. Que vérifie un test d’intercepteur ou de guard ?
+- **Test d'intercepteur (`authInterceptor`)** :
+  Vérifie qu'à chaque sortie de requête HTTP, l'intercepteur clone la requête pour y greffer l'en-tête `Authorization: Bearer <token>` lorsque l'utilisateur est authentifié, qu'il ne touche à rien pour les requêtes publiques, et qu'il réagit correctement aux statuts d'erreur HTTP `401` en déconnectant l'utilisateur et en déclenchant la redirection vers `/login`.
+- **Test de guard (`authGuard`)** :
+  Vérifie la règle de filtrage des routes : si le signal `token()` d'authentification existe, le guard renvoie `true` et permet l'activation du composant. Si le token est absent (`null`), le guard bloque la navigation et renvoie un `UrlTree` vers `/login` pour protéger l'accès à la page.
+
+### 6. Quelle différence existe-t-il entre un test unitaire et un test d’intégration ?
+- **Test Unitaire** :
+  - **Périmètre** : Teste une seule unité de code isolée (une fonction, un service ou un composant) indépendamment de ses dépendances.
+  - **Moyens** : Toutes les dépendances externes (services tiers, base de données, requêtes réseau) sont remplacées par des substituts (*mocks*, *spies*, *stubs*).
+  - **Objectif** : Vérifier la logique interne propre de l'élément (ex : est-ce que `TrackService.list(2, 5)` génère les bons paramètres d'URL ?).
+  - **Vitesse** : Extrêmement rapide (quelques millisecondes).
+- **Test d'Intégration** :
+  - **Périmètre** : Teste la collaboration et la communication entre plusieurs modules ou couches du système fonctionnant ensemble.
+  - **Moyens** : Fait interagir le composant avec ses vrais services ou teste l'API Express connectée à une base de données réelle ou en mémoire.
+  - **Objectif** : Détecter les problèmes d'interfaçage, les ruptures de contrat de données et les incompatibilités entre briques logicielles.
+  - **Vitesse** : Plus lent, nécessite un environnement d'exécution plus lourd.
+
+

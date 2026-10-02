@@ -1,7 +1,9 @@
 import { Component, computed, inject, OnDestroy, OnInit, signal } from '@angular/core';
-import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
+import { HttpEventType } from '@angular/common/http';
 import { Track } from '../../shared/models/track.model';
 import { TrackService } from '../../shared/services/track.service';
+import { SnackBarService } from '../../shared/services/snackbar.service';
 
 /** Formats MIME types into short readable badges (MP3, WAV, etc.) */
 function getFormatBadge(mimeType: string, filename: string): string {
@@ -52,6 +54,7 @@ const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 Mo
 })
 export class TracksPageComponent implements OnInit, OnDestroy {
   private readonly service = inject(TrackService);
+  private readonly snackbar = inject(SnackBarService);
 
   // Signaux pour la pagination et la bibliothèque
   readonly tracks = signal<Track[]>([]);
@@ -62,8 +65,13 @@ export class TracksPageComponent implements OnInit, OnDestroy {
   readonly loading = signal(false);
   readonly error = signal('');
 
-  // Signaux pour l'upload
-  readonly uploading = signal(false);
+  // Signaux pour l'opération de suppression (Mission 5)
+  readonly deletingId = signal<string | null>(null);
+
+  // Signaux pour l'upload et sa progression (Mission 6)
+  readonly uploadStatus = signal<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  readonly uploadProgress = signal<number>(0);
+  readonly uploading = computed(() => this.uploadStatus() === 'uploading');
   readonly uploadError = signal('');
   readonly uploadSuccess = signal('');
   file?: File;
@@ -176,36 +184,55 @@ export class TracksPageComponent implements OnInit, OnDestroy {
   upload(fileInput: HTMLInputElement): void {
     if (!this.file) {
       this.uploadError.set('Veuillez sélectionner un fichier audio.');
+      this.snackbar.error('Veuillez sélectionner un fichier audio.');
       return;
     }
 
-    this.uploading.set(true);
+    this.uploadStatus.set('uploading');
+    this.uploadProgress.set(0);
     this.uploadError.set('');
     this.uploadSuccess.set('');
 
     const trackTitle = this.title.value.trim() || this.file.name;
 
     this.service.upload(this.file, trackTitle).subscribe({
-      next: (track) => {
-        console.debug('[TracksPage] Piste envoyée avec succès', track.id);
-        this.uploadSuccess.set(`Le morceau « ${track.title} » a été ajouté à votre bibliothèque !`);
-        this.title.setValue('');
-        this.file = undefined;
-        fileInput.value = '';
-        this.uploading.set(false);
+      next: (event) => {
+        if (event.type === HttpEventType.UploadProgress && event.total) {
+          const percent = Math.round((event.loaded / event.total) * 100);
+          this.uploadProgress.set(percent);
+          console.debug(`[TracksPage] Progression upload: ${percent}%`);
+        } else if (event.type === HttpEventType.Response) {
+          const track = event.body;
+          const displayTitle = track?.title || trackTitle;
+          console.debug('[TracksPage] Piste envoyée avec succès', track?.id);
+          this.uploadProgress.set(100);
+          this.uploadStatus.set('success');
+          this.uploadSuccess.set(`Le morceau « ${displayTitle} » a été ajouté à votre bibliothèque !`);
+          this.snackbar.success(`Morceau « ${displayTitle} » téléversé avec succès !`);
 
-        // Retour en page 1 et rafraîchissement
-        this.page.set(1);
-        this.load();
+          // Réinitialisation du formulaire
+          this.title.setValue('');
+          this.file = undefined;
+          fileInput.value = '';
 
-        setTimeout(() => this.uploadSuccess.set(''), 5000);
+          // Retour en page 1 et rafraîchissement
+          this.page.set(1);
+          this.load();
+
+          setTimeout(() => {
+            this.uploadSuccess.set('');
+            this.uploadStatus.set('idle');
+            this.uploadProgress.set(0);
+          }, 3500);
+        }
       },
       error: (err: { error?: { message?: string } }) => {
-        this.uploading.set(false);
+        this.uploadStatus.set('error');
+        this.uploadProgress.set(0);
         console.error('[TracksPage] Envoi impossible', err);
-        this.uploadError.set(
-          err.error?.message ?? "Une erreur est survenue lors de l'envoi du fichier audio.",
-        );
+        const errorMsg = err.error?.message ?? "Une erreur est survenue lors de l'envoi du fichier audio.";
+        this.uploadError.set(errorMsg);
+        this.snackbar.error(errorMsg);
       },
     });
   }
@@ -242,10 +269,17 @@ export class TracksPageComponent implements OnInit, OnDestroy {
   }
 
   deleteTrack(track: Track): void {
+    // Empêche les clics multiples ou les suppressions concurrentes
+    if (this.deletingId()) {
+      return;
+    }
+
     const confirmation = window.confirm(
       `Êtes-vous sûr de vouloir supprimer définitivement le morceau « ${track.title} » ?`,
     );
     if (!confirmation) return;
+
+    this.deletingId.set(track.id);
 
     // Si le morceau supprimé était en cours de lecture, stopper l'audio
     if (this.currentTrack()?.id === track.id) {
@@ -258,15 +292,30 @@ export class TracksPageComponent implements OnInit, OnDestroy {
     this.service.delete(track.id).subscribe({
       next: () => {
         console.debug('[TracksPage] Piste supprimée', track.id);
+        this.deletingId.set(null);
+        this.snackbar.success(`Morceau « ${track.title} » supprimé avec succès.`);
+
         // Si c'était la dernière piste de la page et qu'on n'est pas sur la page 1
         if (this.tracks().length === 1 && this.page() > 1) {
           this.page.update((p) => p - 1);
         }
         this.load();
       },
-      error: (err) => {
+      error: (err: { status?: number; error?: { message?: string } }) => {
         console.error('[TracksPage] Erreur lors de la suppression', err);
-        this.error.set("Impossible de supprimer la piste. Vérifiez vos autorisations.");
+        this.deletingId.set(null);
+
+        // Gestion du cas où la piste n'existe plus (supprimée ailleurs) ou n'appartient pas à l'utilisateur
+        if (err.status === 404) {
+          this.snackbar.error(`Ce morceau n'existe plus ou a déjà été supprimé.`);
+          // Synchronise la vue avec le serveur
+          this.load();
+        } else if (err.status === 403) {
+          this.snackbar.error(`Vous n'avez pas l'autorisation de supprimer ce morceau.`);
+        } else {
+          const msg = err.error?.message ?? "Impossible de supprimer la piste. Vérifiez vos autorisations.";
+          this.snackbar.error(msg);
+        }
       },
     });
   }

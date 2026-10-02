@@ -41,3 +41,27 @@ test("schémas Mongoose et relation", () => {
   assert.equal(t.title, "Blues");
   assert.equal(Track.schema.path("ownerId").options.ref, "User");
 });
+
+test("route protégée /api/users/me renvoie 401 sans header Authorization", async () => {
+  const r = await fetch(base + "/api/users/me");
+  assert.equal(r.status, 401);
+  const data = await r.json();
+  assert.match(data.message, /Authentification requise/i);
+});
+
+test("route protégée /api/tracks renvoie 401 avec un JWT invalide", async () => {
+  const r = await fetch(base + "/api/tracks", {
+    headers: { Authorization: "Bearer mauvais-jeton-invalide" },
+  });
+  assert.equal(r.status, 401);
+  const data = await r.json();
+  assert.match(data.message, /invalide/i);
+});
+
+test("route protégée DELETE /api/tracks/:id renvoie 401 sans jeton", async () => {
+  const r = await fetch(base + "/api/tracks/track-123", {
+    method: "DELETE",
+  });
+  assert.equal(r.status, 401);
+});
+

@@ -23,6 +23,7 @@
           <input
             [formControl]="title"
             placeholder="Ex : Solo Blues en La mineur"
+            [disabled]="uploading()"
           />
         </label>
 
@@ -47,6 +48,25 @@
           </div>
         }
 
+        @if (uploadStatus() === 'uploading') {
+          <div class="progress-box" aria-live="polite">
+            <div class="progress-bar-track">
+              <div
+                class="progress-bar-fill"
+                [style.width.%]="uploadProgress()"
+                role="progressbar"
+                [attr.aria-valuenow]="uploadProgress()"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              ></div>
+            </div>
+            <div class="progress-labels">
+              <span>Téléversement en cours...</span>
+              <strong>{{ uploadProgress() }}%</strong>
+            </div>
+          </div>
+        }
+
         <button
           type="button"
           (click)="upload(fileInputRef)"
@@ -54,7 +74,7 @@
           class="btn-primary btn-block"
         >
           @if (uploading()) {
-            <span>Envoi en cours...</span>
+            <span>Envoi en cours ({{ uploadProgress() }}%)...</span>
           } @else {
             <span>Téléverser le morceau</span>
           }
@@ -140,11 +160,17 @@
               <button
                 type="button"
                 class="btn-delete"
+                [class.btn-deleting]="deletingId() === track.id"
                 (click)="deleteTrack(track)"
+                [disabled]="deletingId() !== null"
                 title="Supprimer ce morceau"
-                aria-label="Supprimer ce morceau"
+                [attr.aria-label]="'Supprimer ' + track.title"
               >
-                🗑
+                @if (deletingId() === track.id) {
+                  ⏳
+                } @else {
+                  🗑
+                }
               </button>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import { inject, Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpEvent } from '@angular/common/http';
+import { Observable } from 'rxjs';
 import { Page } from '../models/page.model';
 import { Track } from '../models/track.model';
 
@@ -8,27 +9,31 @@ import { Track } from '../models/track.model';
 export class TrackService {
   private readonly http = inject(HttpClient);
 
-  list(page = 1, limit = 5) {
+  list(page = 1, limit = 5): Observable<Page<Track>> {
     return this.http.get<Page<Track>>('/api/tracks', {
       params: { page, limit },
     });
   }
 
-  upload(file: File, title: string) {
+  upload(file: File, title: string): Observable<HttpEvent<Track>> {
     const body = new FormData();
     body.append('audio', file);
     body.append('title', title);
-    return this.http.post<Track>('/api/tracks', body);
+    return this.http.post<Track>('/api/tracks', body, {
+      reportProgress: true,
+      observe: 'events',
+    });
   }
 
-  audio(id: string) {
+  audio(id: string): Observable<Blob> {
     return this.http.get(`/api/tracks/${id}/audio`, {
       responseType: 'blob',
     });
   }
 
-  delete(id: string) {
+  delete(id: string): Observable<void> {
     return this.http.delete<void>(`/api/tracks/${id}`);
   }
 }
+
 

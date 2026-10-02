@@ -20,6 +20,13 @@
                         "styles": [
                             "src/styles.css"
                         ]
+                    },
+                    "configurations": {
+                        "development": {
+                            "optimization": false,
+                            "extractLicenses": false,
+                            "sourceMap": true
+                        }
                     }
                 },
                 "serve": {
