@@ -17,7 +17,7 @@
         <div class="alert alert-error">{{ uploadError() }}</div>
       }
 
-      <form (submit)="$event.preventDefault(); upload(fileInputRef)">
+      <form (submit)="$event.preventDefault(); upload(fileInputRef, coverInputRef)">
         <label>
           Titre du morceau
           <input
@@ -28,7 +28,7 @@
         </label>
 
         <label>
-          Fichier audio (MP3, WAV, OGG, M4A - Max 25 Mo)
+          Fichier audio (MP3, WAV, OGG, M4A - Max 25 Mo) *
           <input
             #fileInputRef
             type="file"
@@ -37,6 +37,29 @@
             [disabled]="uploading()"
           />
         </label>
+
+        <label>
+          Image de couverture (Optionnel : JPEG, PNG, WebP)
+          <input
+            #coverInputRef
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            (change)="chooseCover($event)"
+            [disabled]="uploading()"
+          />
+        </label>
+
+        @if (coverPreviewUrl()) {
+          <div class="selected-cover-preview">
+            <img [src]="coverPreviewUrl()" alt="Aperçu couverture" class="cover-thumbnail-preview" />
+            <div class="cover-preview-info">
+              <span>Pochette sélectionnée</span>
+              <button type="button" class="btn-remove-cover" (click)="removeCover(coverInputRef)" [disabled]="uploading()">
+                ✕ Supprimer
+              </button>
+            </div>
+          </div>
+        }
 
         @if (file) {
           <div class="selected-file-preview">
@@ -69,7 +92,7 @@
 
         <button
           type="button"
-          (click)="upload(fileInputRef)"
+          (click)="upload(fileInputRef, coverInputRef)"
           [disabled]="!file || uploading()"
           class="btn-primary btn-block"
         >
@@ -120,13 +143,17 @@
             role="listitem"
           >
             <div class="track-cover" [class.playing-pulse]="currentTrack()?.id === track.id">
-              <span class="cover-icon">
-                @if (currentTrack()?.id === track.id) {
-                  🔊
-                } @else {
-                  🎸
-                }
-              </span>
+              @if (track.hasCover && coverUrls()[track.id]) {
+                <img [src]="coverUrls()[track.id]" [alt]="track.title" class="track-cover-img" />
+              } @else {
+                <span class="cover-icon">
+                  @if (currentTrack()?.id === track.id) {
+                    🔊
+                  } @else {
+                    🎸
+                  }
+                </span>
+              }
             </div>
 
             <div class="track-details">
@@ -203,10 +230,20 @@
   @if (currentTrack(); as activeTrack) {
     <aside class="player-bar-container" aria-label="Lecteur audio">
       <div class="player-bar">
-        <div class="player-info">
-          <div class="player-badge">LECTURE EN COURS</div>
-          <strong class="player-title">{{ activeTrack.title }}</strong>
-          <small class="player-meta">{{ activeTrack.originalName }} · {{ formatSize(activeTrack.size) }}</small>
+        <div class="player-track-info-group">
+          <div class="player-cover-thumbnail">
+            @if (activeTrack.hasCover && coverUrls()[activeTrack.id]) {
+              <img [src]="coverUrls()[activeTrack.id]" [alt]="activeTrack.title" class="player-cover-img" />
+            } @else {
+              <div class="player-cover-placeholder">🎸</div>
+            }
+          </div>
+
+          <div class="player-info">
+            <div class="player-badge">LECTURE EN COURS</div>
+            <strong class="player-title">{{ activeTrack.title }}</strong>
+            <small class="player-meta">{{ activeTrack.originalName }} · {{ formatSize(activeTrack.size) }}</small>
+          </div>
         </div>
 
         <div class="player-audio-wrapper">

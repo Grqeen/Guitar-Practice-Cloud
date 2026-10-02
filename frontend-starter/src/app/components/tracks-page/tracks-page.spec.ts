@@ -36,6 +36,7 @@ describe('TracksPageComponent', () => {
       delete: vi.fn().mockReturnValue(of(undefined)),
       upload: vi.fn(),
       audio: vi.fn(),
+      cover: vi.fn().mockReturnValue(of(new Blob(['fake-img'], { type: 'image/png' }))),
     };
 
     TestBed.configureTestingModule({
@@ -87,5 +88,29 @@ describe('TracksPageComponent', () => {
     expect(snackbarErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining("n'existe plus"),
     );
+  });
+
+  it('chooseCover() doit valider le format de limage et generer une preview', () => {
+    const fakeFile = new File(['fake-img-content'], 'cover.png', { type: 'image/png' });
+    const event = {
+      target: {
+        files: [fakeFile],
+        value: 'cover.png',
+      },
+    } as unknown as Event;
+
+    // Mock URL.createObjectURL et revokeObjectURL
+    window.URL.createObjectURL = vi.fn().mockReturnValue('blob:http://localhost/fake-uuid');
+    window.URL.revokeObjectURL = vi.fn();
+
+    component.chooseCover(event);
+
+    expect(component.coverFile).toBe(fakeFile);
+    expect(component.coverPreviewUrl()).toBe('blob:http://localhost/fake-uuid');
+
+    // Test de removeCover()
+    component.removeCover();
+    expect(component.coverFile).toBeUndefined();
+    expect(component.coverPreviewUrl()).toBe('');
   });
 });

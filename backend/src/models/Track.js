@@ -18,6 +18,9 @@ const schema = new mongoose.Schema(
     storedName: { type: String, required: true, select: false },
     mimeType: { type: String, required: true },
     size: { type: Number, required: true, min: 0 },
+    hasCover: { type: Boolean, default: false },
+    coverStoredName: { type: String, select: false },
+    coverMimeType: { type: String },
   },
   { timestamps: true },
 );
@@ -38,6 +41,7 @@ schema.methods.toPublic = function () {
     originalName: this.originalName,
     mimeType: this.mimeType,
     size: this.size,
+    hasCover: Boolean(this.hasCover),
     createdAt: this.createdAt,
   };
 };

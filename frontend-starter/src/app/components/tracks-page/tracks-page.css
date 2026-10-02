@@ -83,6 +83,53 @@
   margin: 0.8rem 0;
 }
 
+.selected-cover-preview {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  margin: 0.8rem 0;
+}
+
+.cover-thumbnail-preview {
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid #94a3b8;
+}
+
+.cover-preview-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1;
+}
+
+.cover-preview-info span {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.btn-remove-cover {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  color: #dc2626;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.btn-remove-cover:hover {
+  color: #991b1b;
+}
+
 .file-icon {
   font-size: 1.5rem;
 }
@@ -146,6 +193,14 @@
   font-size: 1.4rem;
   flex-shrink: 0;
   box-shadow: 0 3px 8px rgba(18, 61, 50, 0.15);
+  overflow: hidden;
+}
+
+.track-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
 }
 
 .playing-pulse {
@@ -361,10 +416,40 @@
   flex-wrap: wrap;
 }
 
+.player-track-info-group {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  max-width: 400px;
+}
+
+.player-cover-thumbnail {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.player-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.player-cover-placeholder {
+  font-size: 1.5rem;
+}
+
 .player-info {
   display: grid;
   gap: 0.25rem;
-  max-width: 320px;
+  min-width: 0;
 }
 
 .player-badge {

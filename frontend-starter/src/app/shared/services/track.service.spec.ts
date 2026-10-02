@@ -83,4 +83,19 @@ describe('TrackService', () => {
 
     req.flush(mockBlob);
   });
+
+  it('cover() doit emettre une requete GET vers /api/tracks/:id/cover avec responseType blob', () => {
+    const mockBlob = new Blob(['fake image binary'], { type: 'image/jpeg' });
+
+    service.cover('track-789').subscribe((blob) => {
+      expect(blob).toBeTruthy();
+      expect(blob.type).toBe('image/jpeg');
+    });
+
+    const req = httpTesting.expectOne('/api/tracks/track-789/cover');
+    expect(req.request.method).toBe('GET');
+    expect(req.request.responseType).toBe('blob');
+
+    req.flush(mockBlob);
+  });
 });

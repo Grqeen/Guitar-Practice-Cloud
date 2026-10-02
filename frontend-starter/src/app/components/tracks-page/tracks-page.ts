@@ -78,6 +78,11 @@ export class TracksPageComponent implements OnInit, OnDestroy {
   readonly uploadSuccess = signal('');
   file?: File;
 
+  // Signaux pour l'image de couverture (Cover Art)
+  coverFile?: File;
+  readonly coverPreviewUrl = signal<string>('');
+  readonly coverUrls = signal<Record<string, string>>({});
+
   // Contrôles de formulaire
   readonly title = new FormControl('', { nonNullable: true });
   readonly searchFilter = new FormControl('', { nonNullable: true });
@@ -109,6 +114,14 @@ export class TracksPageComponent implements OnInit, OnDestroy {
     if (url) {
       URL.revokeObjectURL(url);
     }
+    const preview = this.coverPreviewUrl();
+    if (preview) {
+      URL.revokeObjectURL(preview);
+    }
+    // Révocation de toutes les URLs de couverture chargées
+    Object.values(this.coverUrls()).forEach((coverUrl) => {
+      URL.revokeObjectURL(coverUrl);
+    });
   }
 
   load(): void {
@@ -122,6 +135,24 @@ export class TracksPageComponent implements OnInit, OnDestroy {
         this.pages.set(response.pages);
         this.total.set(response.total);
         this.loading.set(false);
+
+        // Chargement des images de couverture pour les pistes qui en possèdent une
+        response.items.forEach((item) => {
+          if (item.hasCover && !this.coverUrls()[item.id]) {
+            this.service.cover(item.id).subscribe({
+              next: (blob) => {
+                const objectUrl = URL.createObjectURL(blob);
+                this.coverUrls.update((current) => ({
+                  ...current,
+                  [item.id]: objectUrl,
+                }));
+              },
+              error: (err) => {
+                console.warn(`[TracksPage] Impossible de charger la couverture de ${item.id}`, err);
+              },
+            });
+          }
+        });
       },
       error: (err) => {
         console.error('[TracksPage] Chargement impossible', err);
@@ -189,7 +220,51 @@ export class TracksPageComponent implements OnInit, OnDestroy {
     }
   }
 
-  upload(fileInput: HTMLInputElement): void {
+  chooseCover(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const selectedFile = input.files?.[0];
+
+    if (!selectedFile) {
+      return;
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(selectedFile.type)) {
+      this.snackbar.error("Format d'image non supporté. Formats acceptés : JPEG, PNG, WebP.");
+      input.value = '';
+      return;
+    }
+
+    // 5 Mo max pour l'image de couverture
+    if (selectedFile.size > 5 * 1024 * 1024) {
+      this.snackbar.error("L'image de couverture ne doit pas dépasser 5 Mo.");
+      input.value = '';
+      return;
+    }
+
+    // Révocation de l'ancien preview si existant
+    const oldPreview = this.coverPreviewUrl();
+    if (oldPreview) {
+      URL.revokeObjectURL(oldPreview);
+    }
+
+    this.coverFile = selectedFile;
+    this.coverPreviewUrl.set(URL.createObjectURL(selectedFile));
+  }
+
+  removeCover(coverInput?: HTMLInputElement): void {
+    const oldPreview = this.coverPreviewUrl();
+    if (oldPreview) {
+      URL.revokeObjectURL(oldPreview);
+    }
+    this.coverPreviewUrl.set('');
+    this.coverFile = undefined;
+    if (coverInput) {
+      coverInput.value = '';
+    }
+  }
+
+  upload(fileInput: HTMLInputElement, coverInput?: HTMLInputElement): void {
     if (!this.file) {
       this.uploadError.set('Veuillez sélectionner un fichier audio.');
       this.snackbar.error('Veuillez sélectionner un fichier audio.');
@@ -203,7 +278,7 @@ export class TracksPageComponent implements OnInit, OnDestroy {
 
     const trackTitle = this.title.value.trim() || this.file.name;
 
-    this.service.upload(this.file, trackTitle).subscribe({
+    this.service.upload(this.file, trackTitle, this.coverFile).subscribe({
       next: (event) => {
         if (event.type === HttpEventType.UploadProgress && event.total) {
           const percent = Math.round((event.loaded / event.total) * 100);
@@ -222,6 +297,7 @@ export class TracksPageComponent implements OnInit, OnDestroy {
           this.title.setValue('');
           this.file = undefined;
           fileInput.value = '';
+          this.removeCover(coverInput);
 
           // Retour en page 1 et rafraîchissement
           this.page.set(1);
@@ -295,6 +371,17 @@ export class TracksPageComponent implements OnInit, OnDestroy {
       if (url) URL.revokeObjectURL(url);
       this.audioUrl.set('');
       this.currentTrack.set(null);
+    }
+
+    // Libération de l'image de couverture en mémoire si présente
+    const existingCoverUrl = this.coverUrls()[track.id];
+    if (existingCoverUrl) {
+      URL.revokeObjectURL(existingCoverUrl);
+      this.coverUrls.update((current) => {
+        const copy = { ...current };
+        delete copy[track.id];
+        return copy;
+      });
     }
 
     this.service.delete(track.id).subscribe({

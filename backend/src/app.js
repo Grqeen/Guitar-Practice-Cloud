@@ -30,14 +30,20 @@ const SECRET = process.env.JWT_SECRET || "tp1-development-secret";
 // sont refusés par Multer avant d'être écrits sur le disque.
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
 
-// Les types MIME autorisés correspondent aux formats demandés dans le sujet.
-const allowed = new Set([
+// Les types MIME autorisés pour l'audio et pour la couverture.
+const allowedAudio = new Set([
   "audio/mpeg",
   "audio/wav",
   "audio/x-wav",
   "audio/ogg",
   "audio/mp4",
   "audio/x-m4a",
+]);
+
+const allowedImage = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
 ]);
 
 /**
@@ -107,9 +113,15 @@ const upload = multer({
   storage,
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter: (_request, file, callback) => {
-    // Seuls les types MIME audio demandés dans le sujet sont acceptés.
-    if (allowed.has(file.mimetype)) {
-      console.log(`[multer] Type accepté : ${file.mimetype}`);
+    if (file.fieldname === "cover") {
+      if (allowedImage.has(file.mimetype)) {
+        console.log(`[multer] Image de couverture acceptée : ${file.mimetype}`);
+        return callback(null, true);
+      }
+      return callback(new Error("Format d'image non accepté (JPEG, PNG, WebP)"));
+    }
+    if (allowedAudio.has(file.mimetype)) {
+      console.log(`[multer] Type audio accepté : ${file.mimetype}`);
       return callback(null, true);
     }
 
@@ -334,42 +346,49 @@ export function createApp() {
   app.post(
     "/api/tracks",
     auth,
-    upload.single("audio"),
+    upload.fields([
+      { name: "audio", maxCount: 1 },
+      { name: "cover", maxCount: 1 },
+    ]),
     async (req, res, next) => {
       try {
-        if (!req.file) {
-          console.warn(`[tracks] Upload sans fichier par ${req.auth.sub}`);
+        const audioFile = req.files?.audio?.[0] || req.file;
+        const coverFile = req.files?.cover?.[0];
+
+        if (!audioFile) {
+          console.warn(`[tracks] Upload sans fichier audio par ${req.auth.sub}`);
           return res.status(400).json({ message: "Fichier audio requis" });
         }
 
         const track = await Track.create({
           ownerId: req.auth.sub,
-          title: req.body.title || req.file.originalname,
-          originalName: req.file.originalname,
-          storedName: req.file.filename,
-          mimeType: req.file.mimetype,
-          size: req.file.size,
+          title: req.body.title || audioFile.originalname,
+          originalName: audioFile.originalname,
+          storedName: audioFile.filename,
+          mimeType: audioFile.mimetype,
+          size: audioFile.size,
+          hasCover: Boolean(coverFile),
+          coverStoredName: coverFile ? coverFile.filename : undefined,
+          coverMimeType: coverFile ? coverFile.mimetype : undefined,
         });
 
-        console.log(`[tracks] Upload enregistré : ${track.id}`);
+        console.log(`[tracks] Upload enregistré : ${track.id} (Pochette: ${Boolean(coverFile)})`);
         res.status(201).json(track.toPublic());
       } catch (error) {
         console.error("[tracks] Erreur après l'enregistrement du fichier", error);
 
-        // Si MongoDB échoue après l'écriture sur disque, on tente de nettoyer
-        // le fichier orphelin. L'erreur de nettoyage est elle aussi loguée.
-        if (req.file) {
-          const uploadedPath = path.join(UPLOADS, req.file.filename);
+        const filesToClean = [
+          req.files?.audio?.[0]?.filename,
+          req.files?.cover?.[0]?.filename,
+          req.file?.filename,
+        ].filter(Boolean);
+
+        for (const fname of filesToClean) {
           try {
-            await fsPromises.unlink(uploadedPath);
-            console.log(`[tracks] Fichier temporaire supprimé : ${uploadedPath}`);
-          } catch (cleanupError) {
-            console.error(
-              `[tracks] Impossible de supprimer le fichier temporaire ${uploadedPath}`,
-              cleanupError,
-            );
-          }
+            await fsPromises.unlink(path.join(UPLOADS, fname));
+          } catch {}
         }
+
         next(error);
       }
     },
@@ -405,13 +424,36 @@ export function createApp() {
     }
   });
 
+  app.get("/api/tracks/:id/cover", auth, async (req, res, next) => {
+    try {
+      const track = await Track.findOne({
+        _id: req.params.id,
+        ownerId: req.auth.sub,
+      }).select("+coverStoredName");
+
+      if (!track || !track.hasCover || !track.coverStoredName) {
+        return res.status(404).json({ message: "Pochette introuvable" });
+      }
+
+      const coverPath = path.join(UPLOADS, track.coverStoredName);
+      if (!fs.existsSync(coverPath)) {
+        return res.status(404).json({ message: "Fichier de couverture manquant" });
+      }
+
+      res.type(track.coverMimeType || "image/jpeg");
+      res.sendFile(coverPath);
+    } catch (error) {
+      next(error);
+    }
+  });
+
   /** Supprime la métadonnée et le fichier physique correspondant. */
   app.delete("/api/tracks/:id", auth, async (req, res, next) => {
     try {
       const track = await Track.findOneAndDelete({
         _id: req.params.id,
         ownerId: req.auth.sub,
-      }).select("+storedName");
+      }).select("+storedName +coverStoredName");
 
       if (!track) {
         console.warn(`[tracks] Suppression impossible : ${req.params.id}`);
@@ -423,12 +465,17 @@ export function createApp() {
         await fsPromises.unlink(audioPath);
         console.log(`[tracks] Fichier supprimé : ${audioPath}`);
       } catch (error) {
-        // L'exception n'est volontairement pas ignorée : l'administrateur doit
-        // voir ce fichier orphelin si sa suppression échoue.
         console.error(`[tracks] Fichier audio non supprimé : ${audioPath}`, error);
         return res.status(500).json({
           message: "Métadonnée supprimée, mais fichier audio non supprimé",
         });
+      }
+
+      if (track.coverStoredName) {
+        try {
+          await fsPromises.unlink(path.join(UPLOADS, track.coverStoredName));
+          console.log(`[tracks] Pochette supprimée : ${track.coverStoredName}`);
+        } catch {}
       }
 
       res.status(204).end();
