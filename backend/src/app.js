@@ -491,7 +491,8 @@ export function createApp() {
 
     if (
       error instanceof multer.MulterError ||
-      error?.message === "Format audio non accepté"
+      error?.message === "Format audio non accepté" ||
+      error?.message?.includes("non accepté")
     ) {
       return res.status(400).json({ message: error.message });
     }

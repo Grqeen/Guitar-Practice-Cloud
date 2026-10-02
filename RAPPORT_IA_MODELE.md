@@ -386,7 +386,7 @@ Le test s'exécute ainsi en 20 millisecondes, sans avoir besoin d'allumer le bac
 
 Afin d'offrir une expérience utilisateur digne des meilleures plateformes de streaming musical (comme Spotify ou Deezer), nous avons conçu et implémenté l'**intégration complète de pochettes d'album personnalisées** pour chaque backing track :
 
-### Architecture Fullstack mise en place :
+### Architecture Fullstack mise en place (Option 1) :
 1. **Backend & Base de données** :
    - Mise à jour du schéma Mongoose `Track` avec `hasCover: Boolean`, `coverStoredName: String` (avec `select: false` pour la sécurité) et `coverMimeType: String`.
    - Configuration de Multer avec `upload.fields([{ name: 'audio', maxCount: 1 }, { name: 'cover', maxCount: 1 }])` acceptant les images JPEG, PNG et WebP (jusqu'à 5 Mo).
@@ -400,6 +400,20 @@ Afin d'offrir une expérience utilisateur digne des meilleures plateformes de st
    - Affichage dynamique de la pochette sur les cartes de la bibliothèque et dans la barre de lecture audio en cours, avec repli élégant sur l'icône guitare si aucune image n'est renseignée.
    - Libération rigoureuse de la mémoire dans `ngOnDestroy()` et lors de la suppression (`URL.revokeObjectURL`).
 
+### Analyse de l'Alternative (Option 2) : Tags ID3 et Web Services Publics
+Le sujet de TP suggérait également une alternative : extraire automatiquement les métadonnées et la pochette sans forcer l'utilisateur à fournir une image manuelle.
+- **Ce que proposent les tags ID3 (ID3v2)** : Un conteneur d'en-tête inséré directement au début du fichier MP3. Il inclut les métadonnées textuelles standardisées : `TIT2` (titre), `TPE1` (artiste/groupe), `TALB` (nom de l'album), `TYER` (année), ainsi que le tag binaire `APIC` (*Attached Picture*) contenant l'image de couverture encodée en JPEG ou PNG directement à l'intérieur du MP3. Côté serveur Node.js, une bibliothèque comme `music-metadata` permet d'extraire le buffer de cette frame sans altérer le son.
+- **Web Services Publics exploitables** :
+  1. **MusicBrainz / Cover Art Archive** : Base de données collaborative et ouverte. En envoyant le titre et l'artiste (ou l'empreinte acoustique AcoustID), on récupère un identifiant d'enregistrement (`MBID`) qui permet d'interroger `coverartarchive.org/release/{mbid}/front` pour obtenir la jaquette officielle en haute définition.
+  2. **Discogs API** : API REST exhaustive permettant de rechercher des disques et pressages avec tokens d'API gratuits.
+  3. **Deezer / iTunes Search API** : API publiques sans clé obligatoire renvoyant des objets JSON avec les URLs `album.cover_medium` ou `artworkUrl100`.
+
+### Analyse de l'Option Avancée : Pagination Mongoose (`aggregate-paginate-v2`)
+Dans notre implémentation, la pagination utilise l'approche native Mongoose `.skip((page - 1) * limit).limit(limit)`.  
+Le plugin communautaire `mongoose-aggregate-paginate-v2` permet d'aller encore plus loin :
+- **Pipelines d'agrégation** : Il permet d'exécuter des requêtes d'agrégation complexes (`$lookup`, `$match`, `$project`, `$group`) tout en gérant automatiquement la pagination et le comptage sans faire deux requêtes distinctes (`find` + `countDocuments`).
+- **Métadonnées étendues** : Il enrichit la réponse envoyée au client avec des indicateurs très pratiques pour l'UI : `hasNextPage`, `hasPrevPage`, `nextPage`, `prevPage`, `pagingCounter`, facilitant grandement la désactivation dynamique des boutons de navigation côté Angular.
+
 ---
 
 ## 6. Synthèse des Commandes de Validation Finale
@@ -409,7 +423,7 @@ Toutes les étapes de vérification demandées dans le sujet ont été exécuté
 | Commande | Dossier | Résultat obtenu |
 |---|---|---|
 | `npm test` | `frontend-starter` | **15/15 tests passés** (Vitest / Happy-Dom / JSDOM) |
-| `npm test` | `backend` | **6/6 tests passés** (Node Test Runner natif) |
+| `npm test` | `backend` | **9/9 tests passés** (Node Test Runner natif - santé, relation Mongoose, sécurité 401, DELETE, upload sans audio, MIME refusé, audio/cover protégés) |
 | `npm run build` | `frontend-starter` | **Bundle généré avec succès** sans aucune erreur TypeScript ni avertissement |
 | `git push origin main` | racine du projet | Code synchronisé sur GitHub : [https://github.com/Grqeen/Guitar-Practice-Cloud](https://github.com/Grqeen/Guitar-Practice-Cloud) |
 
@@ -420,5 +434,5 @@ Toutes les étapes de vérification demandées dans le sujet ont été exécuté
 Ce projet de 3 séances de travaux pratiques nous a permis de franchir un cap sur l'écosystème **Angular moderne (version 19+)** :
 1. **La réactivité moderne** : Remplacement des anciens `Subscription` et `BehaviorSubject` par les **Angular Signals**, offrant un code beaucoup plus lisible, synchrone et sans fuite de mémoire.
 2. **La robustesse réseau** : Maîtrise des flux asynchrones avec `HttpClient`, gestion fine des codes de statut HTTP (`200`, `201`, `204`, `400`, `401`, `404`), manipulation des `Blob` mémoires pour l'audio/images et suivi de progression d'upload.
-3. **La culture du test** : Mise en place d'une couverture de tests automatisés complète (15 tests frontend + 6 tests backend), nous donnant l'assurance qu'aucune régression ne survient lors des évolutions du code.
+3. **La culture du test** : Mise en place d'une couverture de tests automatisés complète (**15 tests frontend + 9 tests backend = 24 tests unitaires**), nous donnant l'assurance qu'aucune régression ne survient lors des évolutions du code.
 4. **La collaboration avec l'IA** : L'assistant s'est révélé être un formidable partenaire pour accélérer la génération de tests et le diagnostic de bugs complexes (comme la dépendance circulaire de l'intercepteur), tout en renforçant notre esprit critique et notre compréhension fine de l'architecture logicielle.

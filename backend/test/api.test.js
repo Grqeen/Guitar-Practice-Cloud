@@ -89,6 +89,33 @@ test("upload multipart sans fichier audio renvoie 400 Bad Request", async () => 
   assert.match(data.message, /Fichier audio requis/i);
 });
 
+test("upload avec type MIME refusé renvoie 400 Bad Request", async () => {
+  const form = new FormData();
+  form.append("title", "Test MIME invalide");
+  const badBlob = new Blob(["ceci n'est pas du son"], { type: "text/plain" });
+  form.append("audio", badBlob, "notes.txt");
+
+  const r = await fetch(base + "/api/tracks", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${validToken}` },
+    body: form,
+  });
+
+  assert.equal(r.status, 400);
+  const data = await r.json();
+  assert.match(data.message, /Format audio non accepté/i);
+});
+
+test("route protégée GET /api/tracks/:id/audio renvoie 401 sans jeton", async () => {
+  const r = await fetch(base + "/api/tracks/track-123/audio");
+  assert.equal(r.status, 401);
+});
+
+test("route protégée GET /api/tracks/:id/cover renvoie 401 sans jeton", async () => {
+  const r = await fetch(base + "/api/tracks/track-123/cover");
+  assert.equal(r.status, 401);
+});
+
 
 
 
