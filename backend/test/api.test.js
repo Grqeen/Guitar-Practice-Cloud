@@ -58,10 +58,37 @@ test("route protégée /api/tracks renvoie 401 avec un JWT invalide", async () =
   assert.match(data.message, /invalide/i);
 });
 
+import jwt from "jsonwebtoken";
+
+const testSecret = process.env.JWT_SECRET || "tp1-development-secret";
+const validToken = jwt.sign(
+  { sub: new mongoose.Types.ObjectId().toString(), email: "tester@example.com" },
+  testSecret,
+  { expiresIn: "1h" },
+);
+
 test("route protégée DELETE /api/tracks/:id renvoie 401 sans jeton", async () => {
   const r = await fetch(base + "/api/tracks/track-123", {
     method: "DELETE",
   });
   assert.equal(r.status, 401);
 });
+
+test("upload multipart sans fichier audio renvoie 400 Bad Request", async () => {
+  const form = new FormData();
+  form.append("title", "Morceau sans audio");
+
+  const r = await fetch(base + "/api/tracks", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${validToken}` },
+    body: form,
+  });
+
+  assert.equal(r.status, 400);
+  const data = await r.json();
+  assert.match(data.message, /Fichier audio requis/i);
+});
+
+
+
 

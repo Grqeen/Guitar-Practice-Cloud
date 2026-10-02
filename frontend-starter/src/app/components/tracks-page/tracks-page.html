@@ -185,30 +185,17 @@
         }
       </div>
 
-      <!-- Contrôles de pagination serveur -->
-      <nav class="pager" aria-label="Pagination des morceaux">
-        <button
-          type="button"
-          class="btn-secondary"
-          (click)="go(page() - 1)"
-          [disabled]="page() <= 1 || loading()"
-        >
-          ← Précédent
-        </button>
-
-        <span class="pager-info">
-          Page <strong>{{ page() }}</strong> sur <strong>{{ pages() }}</strong>
-        </span>
-
-        <button
-          type="button"
-          class="btn-secondary"
-          (click)="go(page() + 1)"
-          [disabled]="page() >= pages() || loading()"
-        >
-          Suivant →
-        </button>
-      </nav>
+      <!-- Contrôles de pagination avancée Angular Material (Option TP2) -->
+      <mat-paginator
+        [length]="total()"
+        [pageSize]="limit()"
+        [pageIndex]="page() - 1"
+        [pageSizeOptions]="[5, 10, 20]"
+        (page)="onPageChange($event)"
+        aria-label="Pagination de la bibliothèque"
+        class="custom-paginator"
+      >
+      </mat-paginator>
     </article>
   </div>
 

@@ -222,8 +222,9 @@ Implémenter la pagination serveur complète de la bibliothèque audio dans Angu
 
 ### Fichiers modifiés pour la Mission 2
 - `src/app/shared/services/track.service.ts` : Paramétrage dynamique de `list(page, limit)` et méthode `delete(id)`.
-- `src/app/components/tracks-page/tracks-page.ts` : Gestion d'état paginée par Signals, fonctions de navigation `go(p)`.
-- `src/app/components/tracks-page/tracks-page.html` : En-tête de bibliothèque, compteur dynamique, input de filtrage et contrôles de pagination.
+- `src/app/components/tracks-page/tracks-page.ts` : Gestion d'état paginée par Signals, intégration de `MatPaginatorModule` et gestion de l'événement `PageEvent`.
+- `src/app/components/tracks-page/tracks-page.html` : En-tête de bibliothèque, compteur dynamique, input de filtrage et composant `<mat-paginator>` avec choix des tailles de page (`[5, 10, 20]`).
+- `src/styles.css` : Importation du thème officiel `@angular/material/prebuilt-themes/azure-blue.css`.
 
 ---
 

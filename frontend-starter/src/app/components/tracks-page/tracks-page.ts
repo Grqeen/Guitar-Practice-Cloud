@@ -45,10 +45,12 @@ const ALLOWED_MIME_TYPES = new Set([
   'audio/x-m4a',
 ]);
 
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
+
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 Mo
 
 @Component({
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, MatPaginatorModule],
   templateUrl: './tracks-page.html',
   styleUrl: './tracks-page.css',
 })
@@ -134,6 +136,12 @@ export class TracksPageComponent implements OnInit, OnDestroy {
       return;
     }
     this.page.set(pageNumber);
+    this.load();
+  }
+
+  onPageChange(event: PageEvent): void {
+    this.page.set(event.pageIndex + 1);
+    this.limit.set(event.pageSize);
     this.load();
   }
 
